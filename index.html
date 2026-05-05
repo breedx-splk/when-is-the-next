@@ -382,9 +382,10 @@
           <p class="lede">
             Ask about <code>opentelemetry-java</code>,
             <code>opentelemetry-java-instrumentation</code>, or
-            <code>splunk-otel-java</code>. The page computes the next expected
-            release date from documented cadence rules and adds the latest GitHub
-            release for context.
+            <code>opentelemetry-collector</code>, or <code>splunk-otel-java</code>.
+            The page computes the next expected release date from documented
+            cadence rules or published schedules and adds the latest GitHub release
+            for context.
           </p>
         </section>
 
@@ -399,6 +400,9 @@
                   <option value="opentelemetry-java">opentelemetry-java</option>
                   <option value="opentelemetry-java-instrumentation">
                     opentelemetry-java-instrumentation
+                  </option>
+                  <option value="opentelemetry-collector">
+                    opentelemetry-collector
                   </option>
                   <option value="splunk-otel-java">splunk-otel-java</option>
                 </select>
@@ -416,6 +420,9 @@
                     data-repo="opentelemetry-java-instrumentation"
                   >
                     opentelemetry-java-instrumentation
+                  </button>
+                  <button class="quick-pick" type="button" data-repo="opentelemetry-collector">
+                    opentelemetry-collector
                   </button>
                   <button class="quick-pick" type="button" data-repo="splunk-otel-java">
                     splunk-otel-java
@@ -499,6 +506,36 @@
             };
           },
         },
+        "opentelemetry-collector": {
+          label: "opentelemetry-collector",
+          githubRepo: "open-telemetry/opentelemetry-collector",
+          cadenceLabel: "Published release schedule from docs/release.md",
+          cadenceSource:
+            "https://raw.githubusercontent.com/open-telemetry/opentelemetry-collector/main/docs/release.md",
+        async computeNext(baseDate) {
+            try {
+              const schedule = await fetchCollectorSchedule();
+              const next = schedule.find((entry) => entry.date >= baseDate);
+
+              if (next) {
+                return next;
+              }
+            } catch (error) {
+              console.warn("Collector schedule fetch failed, using fallback cadence.", error);
+            }
+
+            return estimateCollectorRelease(baseDate);
+          },
+          describe(nextRelease) {
+            return {
+              headline: formatDate(nextRelease.date),
+              summary:
+                nextRelease.source === "published-schedule"
+                  ? `Expected as ${nextRelease.version} from the collector's published release schedule.`
+                  : `Estimated as ${nextRelease.version} using the collector's recent biweekly release pattern.`,
+            };
+          },
+        },
         "splunk-otel-java": {
           label: "splunk-otel-java",
           githubRepo: "signalfx/splunk-otel-java",
@@ -575,25 +612,45 @@
 
         const repo = REPOS[repoKey];
         const today = todayAtLocalNoon();
-        const rawResult = repo.computeNext(today);
-        const description = repo.describe(rawResult);
-
         elements.answerRepo.textContent = repo.label;
-        elements.answerDate.textContent = description.headline;
-        elements.answerSummary.textContent = description.summary;
-        elements.status.textContent = "Loading latest GitHub release context...";
-
-        const factList = buildFacts(repoKey, rawResult, today);
-        renderFacts(factList);
-        renderSources(repoKey);
+        elements.answerDate.textContent = "Calculating...";
+        elements.answerSummary.textContent = "Working out the next expected release.";
+        elements.status.textContent =
+          repoKey === "opentelemetry-collector"
+            ? "Loading published collector release schedule..."
+            : "Loading latest GitHub release context...";
 
         try {
-          const latest = await fetchLatestRelease(repo.githubRepo);
-          elements.status.textContent = "";
-          renderFacts([...factList, latestReleaseFact(latest)]);
+          const rawResult = await repo.computeNext(today);
+          const description = repo.describe(rawResult);
+
+          elements.answerDate.textContent = description.headline;
+          elements.answerSummary.textContent = description.summary;
+
+          const factList = buildFacts(repoKey, rawResult, today);
+          renderFacts(factList);
+          renderSources(repoKey);
+
+          try {
+            const latest = await fetchLatestRelease(repo.githubRepo);
+            elements.status.textContent =
+              rawResult.source === "fallback-estimate"
+                ? "Using a fallback estimate for the collector schedule."
+                : "";
+            renderFacts([...factList, latestReleaseFact(latest)]);
+          } catch (error) {
+            elements.status.textContent =
+              rawResult.source === "fallback-estimate"
+                ? "Using a fallback estimate for the collector schedule. GitHub release context is unavailable too."
+                : "GitHub release context is unavailable right now. The cadence-based answer is still valid.";
+          }
         } catch (error) {
-          elements.status.textContent =
-            "GitHub release context is unavailable right now. The cadence-based answer is still valid.";
+          elements.answerDate.textContent = "Unable to compute";
+          elements.answerSummary.textContent =
+            "The selected project's release schedule could not be resolved right now.";
+          elements.facts.innerHTML = "";
+          renderSources(repoKey);
+          elements.status.textContent = "Try again in a moment.";
         }
       }
 
@@ -601,7 +658,7 @@
         elements.answerRepo.textContent = "Unknown repo";
         elements.answerDate.textContent = "Try one of the 3 supported repos";
         elements.answerSummary.textContent =
-          "Supported values are opentelemetry-java, opentelemetry-java-instrumentation, and splunk-otel-java.";
+          "Supported values are opentelemetry-java, opentelemetry-java-instrumentation, opentelemetry-collector, and splunk-otel-java.";
         elements.facts.innerHTML = "";
         renderSources();
         elements.status.textContent = "";
@@ -625,6 +682,10 @@
           {
             label: "OpenTelemetry Java release cadence",
             url: "https://opentelemetry.io/docs/languages/java/intro/",
+          },
+          {
+            label: "OpenTelemetry Collector release schedule",
+            url: "https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/release.md",
           },
           {
             label: "Splunk OTel Java release cadence",
@@ -665,6 +726,18 @@
             label: "Window basis",
             value: "Start on the upstream release date and extend 5 working days forward.",
           });
+        } else if (repoKey === "opentelemetry-collector") {
+          facts.push({
+            label: "Scheduled version",
+            value: rawResult.version,
+          });
+          facts.push({
+            label: "Schedule source",
+            value:
+              rawResult.source === "published-schedule"
+                ? "Parsed client-side from the collector repo's published release schedule."
+                : "Estimated from the collector's recent two-week release rhythm.",
+          });
         } else {
           facts.push({
             label: "Days from today",
@@ -689,6 +762,59 @@
           tag: data.tag_name,
           publishedAt: data.published_at,
           url: data.html_url,
+        };
+      }
+
+      let collectorSchedulePromise;
+
+      function fetchCollectorSchedule() {
+        if (!collectorSchedulePromise) {
+          collectorSchedulePromise = fetch(
+            REPOS["opentelemetry-collector"].cadenceSource,
+          )
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`Collector schedule fetch failed with ${response.status}`);
+              }
+              return response.text();
+            })
+            .then(parseCollectorSchedule);
+        }
+
+        return collectorSchedulePromise;
+      }
+
+      function parseCollectorSchedule(markdown) {
+        const releaseScheduleIndex = markdown.indexOf("## Release Schedule");
+        const scheduleSection =
+          releaseScheduleIndex >= 0 ? markdown.slice(releaseScheduleIndex) : markdown;
+        const matches = [
+          ...scheduleSection.matchAll(/(\d{4}-\d{2}-\d{2})\s+(v\d+\.\d+\.\d+)/g),
+        ];
+
+        return matches.map((match) => ({
+          isoDate: match[1],
+          version: match[2],
+          date: isoDateAtLocalNoon(match[1]),
+          source: "published-schedule",
+        }));
+      }
+
+      function estimateCollectorRelease(baseDate) {
+        const anchorDate = isoDateAtLocalNoon("2026-05-11");
+        const anchorVersion = "v0.152.0";
+        const [, anchorMinor] = anchorVersion.match(/^v0\.(\d+)\.0$/) || [];
+        const cycleDays = 14;
+        const daysOffset = Math.max(0, daysBetween(anchorDate, baseDate));
+        const cyclesAhead = Math.ceil(daysOffset / cycleDays);
+        const nextDate = addDays(anchorDate, cyclesAhead * cycleDays);
+        const nextMinor = Number(anchorMinor) + cyclesAhead;
+
+        return {
+          isoDate: formatIsoDate(nextDate),
+          version: `v0.${nextMinor}.0`,
+          date: nextDate,
+          source: "fallback-estimate",
         };
       }
 
@@ -745,6 +871,11 @@
         return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
       }
 
+      function isoDateAtLocalNoon(isoDate) {
+        const [year, month, day] = isoDate.split("-").map(Number);
+        return new Date(year, month - 1, day, 12);
+      }
+
       function daysBetween(a, b) {
         return Math.round((b - a) / 86400000);
       }
@@ -756,6 +887,13 @@
           month: "long",
           day: "numeric",
         }).format(date);
+      }
+
+      function formatIsoDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
       }
 
       function escapeHtml(value) {
