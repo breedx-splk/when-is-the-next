@@ -1,5 +1,7 @@
 # when-is-the-next
 
+[When is the next release?](https://breedx-splk.github.io/when-is-the-next/)
+
 A small single-page web app that answers the question: when is the next release of this OpenTelemetry or Splunk OpenTelemetry project likely to happen?
 
 The app is published as a static site and is intended to provide a quick, documented estimate based on public release policies, published schedules, or clearly stated upstream dependency relationships.
