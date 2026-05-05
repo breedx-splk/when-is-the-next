@@ -10,6 +10,7 @@ The app is published as a static site and is intended to provide a quick, docume
 
 - `opentelemetry-java`
 - `opentelemetry-java-instrumentation`
+- `opentelemetry-android`
 - `opentelemetry-collector`
 - `opentelemetry-collector-contrib`
 - `splunk-otel-java`
