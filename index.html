@@ -382,10 +382,11 @@
           <p class="lede">
             Ask about <code>opentelemetry-java</code>,
             <code>opentelemetry-java-instrumentation</code>, or
-            <code>opentelemetry-collector</code>, or <code>splunk-otel-java</code>.
-            The page computes the next expected release date from documented
-            cadence rules or published schedules and adds the latest GitHub release
-            for context.
+            <code>opentelemetry-collector</code>,
+            <code>opentelemetry-collector-contrib</code>, or
+            <code>splunk-otel-java</code>. The page computes the next expected
+            release date from documented cadence rules or published schedules and
+            adds the latest GitHub release for context.
           </p>
         </section>
 
@@ -403,6 +404,9 @@
                   </option>
                   <option value="opentelemetry-collector">
                     opentelemetry-collector
+                  </option>
+                  <option value="opentelemetry-collector-contrib">
+                    opentelemetry-collector-contrib
                   </option>
                   <option value="splunk-otel-java">splunk-otel-java</option>
                 </select>
@@ -423,6 +427,13 @@
                   </button>
                   <button class="quick-pick" type="button" data-repo="opentelemetry-collector">
                     opentelemetry-collector
+                  </button>
+                  <button
+                    class="quick-pick"
+                    type="button"
+                    data-repo="opentelemetry-collector-contrib"
+                  >
+                    opentelemetry-collector-contrib
                   </button>
                   <button class="quick-pick" type="button" data-repo="splunk-otel-java">
                     splunk-otel-java
@@ -536,6 +547,32 @@
             };
           },
         },
+        "opentelemetry-collector-contrib": {
+          label: "opentelemetry-collector-contrib",
+          githubRepo: "open-telemetry/opentelemetry-collector-contrib",
+          cadenceLabel: "Published collector release schedule shared across core and contrib",
+          cadenceSource:
+            "https://raw.githubusercontent.com/open-telemetry/opentelemetry-collector/main/docs/release.md",
+          async computeNext(baseDate) {
+            const next = await REPOS["opentelemetry-collector"].computeNext(baseDate);
+            return {
+              ...next,
+              source:
+                next.source === "published-schedule"
+                  ? "shared-published-schedule"
+                  : "shared-fallback-estimate",
+            };
+          },
+          describe(nextRelease) {
+            return {
+              headline: formatDate(nextRelease.date),
+              summary:
+                nextRelease.source === "shared-published-schedule"
+                  ? `Expected as ${nextRelease.version} on the shared collector release schedule used by contrib.`
+                  : `Estimated as ${nextRelease.version} using the collector project's recent shared release rhythm.`,
+            };
+          },
+        },
         "splunk-otel-java": {
           label: "splunk-otel-java",
           githubRepo: "signalfx/splunk-otel-java",
@@ -616,7 +653,8 @@
         elements.answerDate.textContent = "Calculating...";
         elements.answerSummary.textContent = "Working out the next expected release.";
         elements.status.textContent =
-          repoKey === "opentelemetry-collector"
+          repoKey === "opentelemetry-collector" ||
+          repoKey === "opentelemetry-collector-contrib"
             ? "Loading published collector release schedule..."
             : "Loading latest GitHub release context...";
 
@@ -634,13 +672,15 @@
           try {
             const latest = await fetchLatestRelease(repo.githubRepo);
             elements.status.textContent =
-              rawResult.source === "fallback-estimate"
+              rawResult.source === "fallback-estimate" ||
+              rawResult.source === "shared-fallback-estimate"
                 ? "Using a fallback estimate for the collector schedule."
                 : "";
             renderFacts([...factList, latestReleaseFact(latest)]);
           } catch (error) {
             elements.status.textContent =
-              rawResult.source === "fallback-estimate"
+              rawResult.source === "fallback-estimate" ||
+              rawResult.source === "shared-fallback-estimate"
                 ? "Using a fallback estimate for the collector schedule. GitHub release context is unavailable too."
                 : "GitHub release context is unavailable right now. The cadence-based answer is still valid.";
           }
@@ -656,9 +696,9 @@
 
       function renderUnknown() {
         elements.answerRepo.textContent = "Unknown repo";
-        elements.answerDate.textContent = "Try one of the 3 supported repos";
+        elements.answerDate.textContent = "Try one of the supported projects";
         elements.answerSummary.textContent =
-          "Supported values are opentelemetry-java, opentelemetry-java-instrumentation, opentelemetry-collector, and splunk-otel-java.";
+          "Supported values are opentelemetry-java, opentelemetry-java-instrumentation, opentelemetry-collector, opentelemetry-collector-contrib, and splunk-otel-java.";
         elements.facts.innerHTML = "";
         renderSources();
         elements.status.textContent = "";
@@ -686,6 +726,10 @@
           {
             label: "OpenTelemetry Collector release schedule",
             url: "https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/release.md",
+          },
+          {
+            label: "OpenTelemetry Collector Contrib releases on GitHub",
+            url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/releases",
           },
           {
             label: "Splunk OTel Java release cadence",
@@ -726,7 +770,10 @@
             label: "Window basis",
             value: "Start on the upstream release date and extend 5 working days forward.",
           });
-        } else if (repoKey === "opentelemetry-collector") {
+        } else if (
+          repoKey === "opentelemetry-collector" ||
+          repoKey === "opentelemetry-collector-contrib"
+        ) {
           facts.push({
             label: "Scheduled version",
             value: rawResult.version,
@@ -734,8 +781,11 @@
           facts.push({
             label: "Schedule source",
             value:
-              rawResult.source === "published-schedule"
-                ? "Parsed client-side from the collector repo's published release schedule."
+              rawResult.source === "published-schedule" ||
+              rawResult.source === "shared-published-schedule"
+                ? repoKey === "opentelemetry-collector-contrib"
+                  ? "Parsed client-side from the collector repo's published release schedule, which contrib shares."
+                  : "Parsed client-side from the collector repo's published release schedule."
                 : "Estimated from the collector's recent two-week release rhythm.",
           });
         } else {
