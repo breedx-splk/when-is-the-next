@@ -302,21 +302,10 @@
 
         <section class="content">
           <section class="panel">
-            <h2>Ask The App</h2>
+            <h2>Select A Project</h2>
             <form id="question-form">
               <div>
-                <label for="question">Question</label>
-                <input
-                  id="question"
-                  name="question"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="When is the next release of splunk-otel-java?"
-                />
-              </div>
-
-              <div>
-                <label for="repo-select">Or pick a repo</label>
+                <label for="repo-select">Pick a repo</label>
                 <select id="repo-select" name="repo">
                   <option value="">Choose one</option>
                   <option value="opentelemetry-java">opentelemetry-java</option>
@@ -455,7 +444,6 @@
 
       const elements = {
         form: document.getElementById("question-form"),
-        question: document.getElementById("question"),
         select: document.getElementById("repo-select"),
         answerRepo: document.getElementById("answer-repo"),
         answerDate: document.getElementById("answer-date"),
@@ -468,7 +456,6 @@
       document.querySelectorAll(".quick-pick").forEach((button) => {
         button.addEventListener("click", () => {
           elements.select.value = button.dataset.repo;
-          elements.question.value = `When is the next release of ${button.dataset.repo}?`;
           runAnswer(button.dataset.repo);
         });
       });
@@ -479,19 +466,17 @@
           return;
         }
 
-        elements.question.value = `When is the next release of ${repoKey}?`;
         runAnswer(repoKey);
       });
 
       elements.form.addEventListener("submit", (event) => {
         event.preventDefault();
-        const repoKey = resolveRepo(elements.question.value, elements.select.value);
+        const repoKey = resolveRepo(elements.select.value);
         runAnswer(repoKey);
       });
 
       const initialRepo = "opentelemetry-java";
       elements.select.value = initialRepo;
-      elements.question.value = `When is the next release of ${initialRepo}?`;
       runAnswer(initialRepo);
 
       async function runAnswer(repoKey) {
@@ -626,33 +611,8 @@
         };
       }
 
-      function resolveRepo(question, selectedRepo) {
-        const normalized = normalize(question);
-        if (normalized) {
-          for (const [repoKey, repo] of Object.entries(REPOS)) {
-            if (normalized.includes(repoKey)) {
-              return repoKey;
-            }
-
-            if (repo.aliases.some((alias) => normalized.includes(alias))) {
-              return repoKey;
-            }
-          }
-        }
-
-        if (selectedRepo && REPOS[selectedRepo]) {
-          return selectedRepo;
-        }
-
-        return "";
-      }
-
-      function normalize(value) {
-        return String(value || "")
-          .toLowerCase()
-          .replace(/[^a-z0-9- ]+/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
+      function resolveRepo(selectedRepo) {
+        return selectedRepo && REPOS[selectedRepo] ? selectedRepo : "";
       }
 
       function nextMonthlyDate(baseDate, builder) {
