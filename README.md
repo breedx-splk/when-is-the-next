@@ -31,3 +31,7 @@ That can include:
 - a documented downstream relationship to an upstream project with a predictable release process
 
 If a project does not have a stable and documented release pattern, it should not be added just by guessing from historical releases.
+
+## Disclaimer
+
+Slopvomited with codex.
