@@ -417,6 +417,7 @@
           <h1>When is the next release?</h1>
           <p class="lede">
             Ask about <code>opentelemetry-java</code>,
+            <code>opentelemetry-java-contrib</code>,
             <code>opentelemetry-java-instrumentation</code>,
             <code>opentelemetry-android</code>, or
             <code>opentelemetry-collector</code>,
@@ -436,6 +437,9 @@
                 <select id="repo-select" name="repo">
                   <option value="">Choose one</option>
                   <option value="opentelemetry-java">opentelemetry-java</option>
+                  <option value="opentelemetry-java-contrib">
+                    opentelemetry-java-contrib
+                  </option>
                   <option value="opentelemetry-java-instrumentation">
                     opentelemetry-java-instrumentation
                   </option>
@@ -457,6 +461,9 @@
                 <div class="pick-row">
                   <button class="quick-pick" type="button" data-repo="opentelemetry-java">
                     opentelemetry-java
+                  </button>
+                  <button class="quick-pick" type="button" data-repo="opentelemetry-java-contrib">
+                    opentelemetry-java-contrib
                   </button>
                   <button
                     class="quick-pick"
@@ -555,6 +562,33 @@
                 nextDate.isPendingCurrentCycle
                   ? "The documented monthly release day has passed, but the latest GitHub release suggests this month's core Java release is still pending."
                   : "Expected on the documented monthly release day for the core Java repo.",
+            };
+          },
+        },
+        "opentelemetry-java-contrib": {
+          label: "opentelemetry-java-contrib",
+          githubRepo: "open-telemetry/opentelemetry-java-contrib",
+          cadenceLabel: "Friday after the second Monday of the month",
+          cadenceSource:
+            "https://github.com/open-telemetry/opentelemetry-java-contrib/blob/60bd641dba1be9e0514979c0210925aa6761a831/RELEASING.md?plain=1#L13",
+          aliases: [
+            "otel java contrib",
+            "opentelemetry java contrib",
+            "opentelemetry-java-contrib",
+          ],
+          computeNext(baseDate, context = {}) {
+            return nextMonthlyDate(baseDate, (year, month) => {
+              const secondMonday = nthWeekdayOfMonth(year, month, 1, 2);
+              return addDays(secondMonday, 4);
+            }, context.latestRelease);
+          },
+          describe(nextDate) {
+            return {
+              headline: formatDate(nextDate),
+              summary:
+                nextDate.isPendingCurrentCycle
+                  ? "The documented monthly release day has passed, but the latest GitHub release suggests this month's contrib release is still pending."
+                  : "Expected on the documented monthly release day for the Java contrib repo, a couple of days after Java instrumentation.",
             };
           },
         },
@@ -793,7 +827,7 @@
         elements.answerRepo.textContent = "Unknown repo";
         elements.answerDate.textContent = "Try one of the supported projects";
         elements.answerSummary.textContent =
-          "Supported values are opentelemetry-java, opentelemetry-java-instrumentation, opentelemetry-android, opentelemetry-collector, opentelemetry-collector-contrib, and splunk-otel-java.";
+          "Supported values are opentelemetry-java, opentelemetry-java-contrib, opentelemetry-java-instrumentation, opentelemetry-android, opentelemetry-collector, opentelemetry-collector-contrib, and splunk-otel-java.";
         elements.facts.innerHTML = "";
         renderSources();
         elements.status.textContent = "";
@@ -817,6 +851,10 @@
           {
             label: "OpenTelemetry Java release cadence",
             url: "https://opentelemetry.io/docs/languages/java/intro/",
+          },
+          {
+            label: "OpenTelemetry Java Contrib release cadence",
+            url: REPOS["opentelemetry-java-contrib"].cadenceSource,
           },
           {
             label: "OpenTelemetry Android release cadence",
@@ -891,6 +929,25 @@
             label: "Rule basis",
             value:
               "Android releases are documented as following upstream Java instrumentation, using the clarified Tuesday-after-third-Monday target.",
+          });
+          if (rawResult.isPendingCurrentCycle) {
+            facts.push({
+              label: "Current cycle status",
+              value:
+                "The nominal release day has passed, but GitHub does not yet show this month's release.",
+            });
+          }
+        } else if (repoKey === "opentelemetry-java-contrib") {
+          facts.push({
+            label: "Next upstream instrumentation release",
+            value: formatDate(
+              REPOS["opentelemetry-java-instrumentation"].computeNext(today),
+            ),
+          });
+          facts.push({
+            label: "Rule basis",
+            value:
+              "Java contrib documents monthly minor releases on the Friday after the second Monday, roughly a couple of days after Java instrumentation.",
           });
           if (rawResult.isPendingCurrentCycle) {
             facts.push({

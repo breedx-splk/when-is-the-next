@@ -9,6 +9,7 @@ The app is published as a static site and is intended to provide a quick, docume
 ## Supported Projects
 
 - `opentelemetry-java`
+- `opentelemetry-java-contrib`
 - `opentelemetry-java-instrumentation`
 - `opentelemetry-android`
 - `opentelemetry-collector`
